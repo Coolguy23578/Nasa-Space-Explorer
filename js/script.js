@@ -24,14 +24,20 @@ const GENERIC_APOD_EXPLANATION = 'Discover the cosmos! Each day a different imag
 
 // Fetch the photos for the selected date range
 async function getSpaceImages() {
+    // Read the values at click time so the request and filter use the same range.
+    const selectedStartDate = startInput.value;
+    const selectedEndDate = endInput.value;
+    console.log('APOD date range selected:', selectedStartDate, selectedEndDate);
+
     const searchParams = new URLSearchParams({
         api_key: API_KEY,
-        start_date: startInput.value,
-        end_date: endInput.value
+        start_date: selectedStartDate,
+        end_date: selectedEndDate
     });
     const url = `${API_URL}?${searchParams}`;
 
     try {
+        gallery.innerHTML = '';
         gallery.innerHTML = '<div class="placeholder"><p>Loading space images...</p></div>';
         const response = await fetch(url);
 
@@ -40,7 +46,7 @@ async function getSpaceImages() {
         }
 
         const data = await response.json();
-        displayImages(Array.isArray(data) ? data : [data]);
+        displayImages(Array.isArray(data) ? data : [data], selectedStartDate, selectedEndDate);
     } catch (error) {
         gallery.innerHTML = `<div class="placeholder"><p>NASA's APOD service is unavailable right now. Please try again later.</p></div>`;
         console.error("Error loading NASA images:", error);
@@ -48,17 +54,19 @@ async function getSpaceImages() {
 }
 
 // Create a card for every valid APOD image or video returned by NASA.
-function displayImages(images) {
+function displayImages(images, startDate, endDate) {
     gallery.innerHTML = '';
 
     const recordKeys = new Set();
     const validRecords = images.filter((image) => {
+        const isInSelectedRange = image.date >= startDate && image.date <= endDate;
         const mediaUrl = getMediaUrl(image);
         const isGenericTitle = image.title === GENERIC_APOD_TITLE;
         const isGenericExplanation = image.explanation?.startsWith(GENERIC_APOD_EXPLANATION);
         const isNASAPlaceholder = mediaUrl?.toLowerCase().includes('nasa-logo');
         const recordKey = `${image.date}:${mediaUrl}`;
-        const isUsable = (image.media_type === 'image' || image.media_type === 'video')
+        const isUsable = isInSelectedRange
+            && (image.media_type === 'image' || image.media_type === 'video')
             && image.title
             && image.explanation
             && /^https?:\/\//.test(mediaUrl || '')
@@ -78,20 +86,37 @@ function displayImages(images) {
     validRecords.forEach((image) => {
         const card = document.createElement('article');
         card.className = 'gallery-item';
-        card.tabIndex = 0;
-        card.setAttribute('role', 'button');
-        card.setAttribute('aria-label', `View details for ${image.title}`);
 
         if (image.media_type === 'image') {
             const thumbnail = document.createElement('img');
             thumbnail.src = image.mediaUrl;
             thumbnail.alt = image.title;
+            thumbnail.tabIndex = 0;
+            thumbnail.setAttribute('role', 'button');
+            thumbnail.setAttribute('aria-label', `View details for ${image.title}`);
             thumbnail.addEventListener('error', () => removeInvalidCard(card));
+            thumbnail.addEventListener('click', () => openModal(image));
+            thumbnail.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openModal(image);
+                }
+            });
             card.appendChild(thumbnail);
         } else {
             const videoPreview = document.createElement('div');
             videoPreview.className = 'video-preview';
             videoPreview.textContent = 'Video APOD - click to view';
+            videoPreview.tabIndex = 0;
+            videoPreview.setAttribute('role', 'button');
+            videoPreview.setAttribute('aria-label', `View details for ${image.title}`);
+            videoPreview.addEventListener('click', () => openModal(image));
+            videoPreview.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openModal(image);
+                }
+            });
             card.appendChild(videoPreview);
         }
 
@@ -102,18 +127,7 @@ function displayImages(images) {
         date.className = 'image-date';
         date.textContent = image.date;
 
-        const explanation = document.createElement('p');
-        explanation.className = 'image-explanation';
-        explanation.textContent = getReadableDescription(image.explanation);
-
-        card.append(title, date, explanation);
-        card.addEventListener('click', () => openModal(image));
-        card.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                openModal(image);
-            }
-        });
+        card.append(title, date);
         gallery.appendChild(card);
     });
 

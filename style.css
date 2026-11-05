@@ -108,7 +108,7 @@ button:hover {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  cursor: pointer;
+  cursor: default;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -132,6 +132,7 @@ button:hover {
   height: 200px;
   object-fit: cover;
   border-radius: 4px;
+  cursor: pointer;
 }
 
 .video-preview {
@@ -143,6 +144,7 @@ button:hover {
   background-color: #212121;
   color: white;
   text-align: center;
+  cursor: pointer;
 }
 
 .gallery-item p {
