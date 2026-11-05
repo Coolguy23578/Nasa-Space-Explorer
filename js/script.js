@@ -60,9 +60,8 @@ function displayImages(images) {
     gallery.innerHTML = '';
 
     const realImages = images.filter((image) => {
-        const isNASAPlaceholder = image.url?.includes('nasa-logo');
-        return image.media_type === 'image' && image.url && !isNASAPlaceholder;
-    });
+    return image.media_type === 'image' && image.hdurl;
+});
 
     realImages.forEach((image) => {
 
@@ -73,7 +72,7 @@ function displayImages(images) {
         card.setAttribute('aria-label', `View details for ${image.title}`);
 
         const thumbnail = document.createElement('img');
-        thumbnail.src = image.hdurl || image.url;
+        thumbnail.src = image.hdurl;
         thumbnail.alt = image.title;
 
         const title = document.createElement('h2');
@@ -111,7 +110,7 @@ function displayImages(images) {
 
 // Show the selected image and its full NASA explanation
 function openModal(image) {
-    modalImage.src = image.hdurl || image.url;
+    modalImage.src = image.hdurl;
     modalImage.alt = image.title;
     modalDate.textContent = image.date;
     modalTitle.textContent = image.title;
