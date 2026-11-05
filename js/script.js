@@ -21,6 +21,40 @@ const API_URL = "https://api.nasa.gov/planetary/apod";
 const IMAGE_LIBRARY_URL = "https://images-api.nasa.gov/search";
 const GENERIC_APOD_TITLE = 'NASA Science';
 const GENERIC_APOD_EXPLANATION = 'Discover the cosmos! Each day a different image';
+const ASTRONOMY_SEARCHES = [
+    'galaxy',
+    'nebula',
+    'planet',
+    'moon',
+    'star',
+    'comet',
+    'asteroid',
+    'deep space'
+];
+const EXCLUDED_TERMS = [
+    'training',
+    'mockup',
+    'employee',
+    'facility',
+    'promotional',
+    'logo',
+    'portrait',
+    'classroom',
+    'simulator'
+];
+const PREFERRED_TERMS = [
+    'galaxy',
+    'nebula',
+    'planet',
+    'moon',
+    'star',
+    'comet',
+    'asteroid',
+    'solar system',
+    'deep space',
+    'telescope',
+    'observatory'
+];
 
 // Fetch the photos for the selected date range
 async function getSpaceImages() {
@@ -48,28 +82,54 @@ async function getSpaceImages() {
 
 // Load real NASA photographs when APOD returns generic placeholder records.
 async function getNASAImageLibraryPhotos() {
-    const url = `${IMAGE_LIBRARY_URL}?q=space&media_type=image&page_size=18`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-        throw new Error("Failed to fetch NASA image library photos");
-    }
-
-    const result = await response.json();
-    const photos = result.collection.items.map((item) => {
-        const details = item.data?.[0];
-        const imageLink = item.links?.find((link) => link.render === 'image' && link.rel !== 'preview')
-            || item.links?.find((link) => link.render === 'image');
-
-        return {
-            date: details?.date_created?.split('T')[0] || 'NASA image',
-            title: details?.title,
-            explanation: getReadableDescription(details?.description),
+    const startYear = new Date(`${startInput.value}T00:00:00`).getUTCFullYear();
+    const endYear = new Date(`${endInput.value}T00:00:00`).getUTCFullYear();
+    const searchResults = await Promise.all(ASTRONOMY_SEARCHES.map(async (searchTerm) => {
+        const searchParams = new URLSearchParams({
+            q: searchTerm,
             media_type: 'image',
-            url: imageLink?.href,
-            source: 'NASA Image and Video Library'
-        };
-    });
+            year_start: String(startYear),
+            year_end: String(endYear),
+            page_size: '12'
+        });
+        const response = await fetch(`${IMAGE_LIBRARY_URL}?${searchParams}`);
+
+        if (!response.ok) {
+            throw new Error(`NASA image search failed for ${searchTerm}`);
+        }
+
+        return (await response.json()).collection?.items || [];
+    }));
+
+    const photos = searchResults
+        .flat()
+        .map((item) => {
+            const details = item.data?.[0];
+            const imageLink = item.links?.find((link) => link.render === 'image' && link.rel === 'canonical')
+                || item.links?.find((link) => link.render === 'image' && link.rel !== 'preview')
+                || item.links?.find((link) => link.render === 'image');
+            const text = `${details?.title || ''} ${details?.description || ''}`.toLowerCase();
+            const score = PREFERRED_TERMS.reduce((total, term) => total + (text.includes(term) ? 1 : 0), 0);
+
+            return {
+                id: details?.nasa_id || item.href,
+                date: details?.date_created?.split('T')[0] || 'NASA image',
+                title: details?.title,
+                explanation: getReadableDescription(details?.description),
+                media_type: 'image',
+                url: imageLink?.href,
+                score,
+                searchDate: startInput.value === endInput.value
+                    ? startInput.value
+                    : `${startInput.value} to ${endInput.value}`,
+                source: 'NASA Image and Video Library'
+            };
+        })
+        .filter((image) => {
+            const text = `${image.title || ''} ${image.explanation || ''}`.toLowerCase();
+            return image.score > 0 && !EXCLUDED_TERMS.some((term) => text.includes(term));
+        })
+        .sort((first, second) => second.score - first.score);
 
     if (!displayImages(photos)) {
         throw new Error("NASA returned no usable image library photos");
@@ -91,6 +151,7 @@ function getReadableDescription(description) {
 function displayImages(images) {
     gallery.innerHTML = '';
 
+    const imageIds = new Set();
     const imageUrls = new Set();
     const realImages = images.filter((image) => {
         const imageUrl = image.hdurl || image.url;
@@ -104,10 +165,12 @@ function displayImages(images) {
             && !isGenericTitle
             && !isGenericExplanation
             && !isNASAPlaceholder
+            && !imageIds.has(image.id || imageUrl)
             && !imageUrls.has(imageUrl);
 
         if (isUsable) {
             image.imageUrl = imageUrl;
+            imageIds.add(image.id || imageUrl);
             imageUrls.add(imageUrl);
         }
 
@@ -125,7 +188,12 @@ function displayImages(images) {
         const thumbnail = document.createElement('img');
         thumbnail.src = image.imageUrl;
         thumbnail.alt = image.title;
-        thumbnail.addEventListener('error', () => card.remove());
+        thumbnail.addEventListener('error', () => {
+            card.remove();
+            if (!gallery.querySelector('.gallery-item')) {
+                gallery.innerHTML = '<div class="placeholder"><p>No usable space photos were found.</p></div>';
+            }
+        });
 
         const title = document.createElement('h2');
         title.textContent = image.title;
