@@ -1,31 +1,113 @@
-// Find our date picker inputs on the page
+// Find the controls and gallery on the page
 const startInput = document.getElementById('startDate');
 const endInput = document.getElementById('endDate');
+const getImagesButton = document.querySelector('.filters button');
+const gallery = document.getElementById('gallery');
 
-// Call the setupDateInputs function from dateRange.js
-// This sets up the date pickers to:
-// - Default to a range of 9 days (from 9 days ago to today)
-// - Restrict dates to NASA's image archive (starting from 1995)
+// Find the modal elements
+const imageModal = document.getElementById('imageModal');
+const closeModalButton = document.getElementById('closeModal');
+const modalImage = document.getElementById('modalImage');
+const modalDate = document.getElementById('modalDate');
+const modalTitle = document.getElementById('modalTitle');
+const modalExplanation = document.getElementById('modalExplanation');
+
+// Set up the date inputs with NASA's valid date range and default dates
 setupDateInputs(startInput, endInput);
+
 const API_KEY = "NTThCMD8hwz8cLDnpNGT9CdGRrGM6FfnG8h6dkFm";
-const API_URL = "https://api.nasa.gov/planetary/apod";
-async function testNASA() {
-    const url = `${API_URL}?api_key=${API_KEY}&start_date=2026-11-01&end_date=2026-11-05`;
+const API_URL = "https://science.nasa.gov/wp-json/wp/v2/apod-basic";
+
+// Fetch the photos for the selected date range
+async function getSpaceImages() {
+    const url = `${API_URL}?api_key=${API_KEY}&start_date=${startInput.value}&end_date=${endInput.value}`;
 
     try {
+        gallery.innerHTML = '<div class="placeholder"><p>Loading space images...</p></div>';
         const response = await fetch(url);
 
         if (!response.ok) {
-            throw new Error("Failed to fetch NASA data");
+            throw new Error("Failed to fetch NASA images");
         }
 
         const data = await response.json();
-
-        console.log(data);
-
+        displayImages(data);
     } catch (error) {
-        console.error("Error:", error);
+        gallery.innerHTML = `<div class="placeholder"><p>We could not load the images. Please try again.</p></div>`;
+        console.error("Error loading NASA images:", error);
     }
 }
 
-testNASA();
+// Create a card for every photo returned by NASA
+function displayImages(images) {
+    gallery.innerHTML = '';
+
+    images.forEach((image) => {
+        if (image.media_type !== 'image') {
+            return;
+        }
+
+        const card = document.createElement('article');
+        card.className = 'gallery-item';
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', `View details for ${image.title}`);
+
+        const thumbnail = document.createElement('img');
+        thumbnail.src = image.url;
+        thumbnail.alt = image.title;
+
+        const title = document.createElement('h2');
+        title.textContent = image.title;
+
+        const date = document.createElement('p');
+        date.className = 'image-date';
+        date.textContent = image.date;
+
+        card.append(thumbnail, title, date);
+        card.addEventListener('click', () => openModal(image));
+        card.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openModal(image);
+            }
+        });
+        gallery.appendChild(card);
+    });
+
+    if (!gallery.children.length) {
+        gallery.innerHTML = '<div class="placeholder"><p>No images were found for these dates.</p></div>';
+    }
+}
+
+// Show the selected image and its full NASA explanation
+function openModal(image) {
+    modalImage.src = image.hdurl || image.url;
+    modalImage.alt = image.title;
+    modalDate.textContent = image.date;
+    modalTitle.textContent = image.title;
+    modalExplanation.textContent = image.explanation;
+    imageModal.hidden = false;
+    document.body.classList.add('modal-open');
+    closeModalButton.focus();
+}
+
+// Close the modal and clear its image
+function closeModal() {
+    imageModal.hidden = true;
+    modalImage.src = '';
+    document.body.classList.remove('modal-open');
+}
+
+getImagesButton.addEventListener('click', getSpaceImages);
+closeModalButton.addEventListener('click', closeModal);
+imageModal.addEventListener('click', (event) => {
+    if (event.target === imageModal) {
+        closeModal();
+    }
+});
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !imageModal.hidden) {
+        closeModal();
+    }
+});
