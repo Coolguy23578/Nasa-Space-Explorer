@@ -8,6 +8,7 @@ const gallery = document.getElementById('gallery');
 const imageModal = document.getElementById('imageModal');
 const closeModalButton = document.getElementById('closeModal');
 const modalImage = document.getElementById('modalImage');
+const modalSource = document.getElementById('modalSource');
 const modalDate = document.getElementById('modalDate');
 const modalTitle = document.getElementById('modalTitle');
 const modalExplanation = document.getElementById('modalExplanation');
@@ -17,6 +18,9 @@ setupDateInputs(startInput, endInput);
 
 const API_KEY = "jrRmc7CTBzF9PtGFwTfnnNt9FNjdzr6LwkkKBmz8";
 const API_URL = "https://api.nasa.gov/planetary/apod";
+const IMAGE_LIBRARY_URL = "https://images-api.nasa.gov/search";
+const GENERIC_APOD_TITLE = 'NASA Science';
+const GENERIC_APOD_EXPLANATION = 'Discover the cosmos! Each day a different image';
 
 // Fetch the photos for the selected date range
 async function getSpaceImages() {
@@ -31,18 +35,46 @@ async function getSpaceImages() {
         }
 
         const data = await response.json();
-        console.log("NASA RESPONSE:", data);
-        console.log("FIRST IMAGE:", Array.isArray(data) ? data[0] : data);
         const hasRealPhotos = displayImages(Array.isArray(data) ? data : [data]);
 
-       
+        if (!hasRealPhotos) {
+            await getNASAImageLibraryPhotos();
+        }
     } catch (error) {
-        gallery.innerHTML = `<div class="placeholder"><p>We could not load the images. Please try again.</p></div>`;
+        gallery.innerHTML = `<div class="placeholder"><p>NASA's image services are unavailable right now. Please try again later.</p></div>`;
         console.error("Error loading NASA images:", error);
     }
 }
 
+// Load real NASA photographs when APOD returns generic placeholder records.
+async function getNASAImageLibraryPhotos() {
+    const url = `${IMAGE_LIBRARY_URL}?q=space&media_type=image&page_size=18`;
+    const response = await fetch(url);
 
+    if (!response.ok) {
+        throw new Error("Failed to fetch NASA image library photos");
+    }
+
+    const result = await response.json();
+    const photos = result.collection.items.map((item) => {
+        const details = item.data?.[0];
+        const imageLink = item.links?.find((link) => link.render === 'image' && link.rel !== 'preview')
+            || item.links?.find((link) => link.render === 'image');
+
+        return {
+            date: details?.date_created?.split('T')[0] || 'NASA image',
+            title: details?.title,
+            explanation: getReadableDescription(details?.description),
+            media_type: 'image',
+            url: imageLink?.href,
+            source: 'NASA Image and Video Library'
+        };
+    });
+
+    if (!displayImages(photos)) {
+        throw new Error("NASA returned no usable image library photos");
+    }
+}
 
 // Remove HTML markup so descriptions appear as readable text.
 function getReadableDescription(description) {
@@ -59,9 +91,28 @@ function getReadableDescription(description) {
 function displayImages(images) {
     gallery.innerHTML = '';
 
+    const imageUrls = new Set();
     const realImages = images.filter((image) => {
-    return image.media_type === 'image' && image.hdurl;
-});
+        const imageUrl = image.hdurl || image.url;
+        const isGenericTitle = image.title === GENERIC_APOD_TITLE;
+        const isGenericExplanation = image.explanation?.startsWith(GENERIC_APOD_EXPLANATION);
+        const isNASAPlaceholder = imageUrl?.toLowerCase().includes('nasa-logo');
+        const isUsable = image.media_type === 'image'
+            && image.title
+            && image.explanation
+            && /^https?:\/\//.test(imageUrl || '')
+            && !isGenericTitle
+            && !isGenericExplanation
+            && !isNASAPlaceholder
+            && !imageUrls.has(imageUrl);
+
+        if (isUsable) {
+            image.imageUrl = imageUrl;
+            imageUrls.add(imageUrl);
+        }
+
+        return isUsable;
+    });
 
     realImages.forEach((image) => {
 
@@ -72,8 +123,9 @@ function displayImages(images) {
         card.setAttribute('aria-label', `View details for ${image.title}`);
 
         const thumbnail = document.createElement('img');
-        thumbnail.src = image.hdurl;
+        thumbnail.src = image.imageUrl;
         thumbnail.alt = image.title;
+        thumbnail.addEventListener('error', () => card.remove());
 
         const title = document.createElement('h2');
         title.textContent = image.title;
@@ -86,7 +138,11 @@ function displayImages(images) {
         explanation.className = 'image-explanation';
         explanation.textContent = image.explanation;
 
-        card.append(thumbnail, title, date, explanation);
+        const source = document.createElement('p');
+        source.className = 'image-source';
+        source.textContent = image.source || 'NASA Astronomy Picture of the Day';
+
+        card.append(thumbnail, title, date, source, explanation);
         card.addEventListener('click', () => openModal(image));
         card.addEventListener('keydown', (event) => {
             if (event.key === 'Enter' || event.key === ' ') {
@@ -110,8 +166,9 @@ function displayImages(images) {
 
 // Show the selected image and its full NASA explanation
 function openModal(image) {
-    modalImage.src = image.hdurl;
+    modalImage.src = image.imageUrl;
     modalImage.alt = image.title;
+    modalSource.textContent = image.source || 'NASA Astronomy Picture of the Day';
     modalDate.textContent = image.date;
     modalTitle.textContent = image.title;
     modalExplanation.textContent = image.explanation;

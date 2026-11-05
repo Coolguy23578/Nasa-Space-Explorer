@@ -150,6 +150,14 @@ button:hover {
   color: #666;
 }
 
+.gallery-item .image-source,
+.modal-source {
+  margin-top: 6px;
+  color: #555;
+  font-size: 12px;
+  font-weight: bold;
+}
+
 .gallery-item .image-explanation {
   color: #333;
   line-height: 1.5;
