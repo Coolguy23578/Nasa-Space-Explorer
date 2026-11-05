@@ -16,7 +16,7 @@ const modalExplanation = document.getElementById('modalExplanation');
 setupDateInputs(startInput, endInput);
 
 const API_KEY = "NTThCMD8hwz8cLDnpNGT9CdGRrGM6FfnG8h6dkFm";
-const API_URL = "https://science.nasa.gov/wp-json/wp/v2/apod-basic";
+const API_URL = "https://api.nasa.gov/planetary/apod";
 
 // Fetch the photos for the selected date range
 async function getSpaceImages() {
@@ -31,7 +31,7 @@ async function getSpaceImages() {
         }
 
         const data = await response.json();
-        displayImages(data);
+        displayImages(Array.isArray(data) ? data : [data]);
     } catch (error) {
         gallery.innerHTML = `<div class="placeholder"><p>We could not load the images. Please try again.</p></div>`;
         console.error("Error loading NASA images:", error);
@@ -64,7 +64,11 @@ function displayImages(images) {
         date.className = 'image-date';
         date.textContent = image.date;
 
-        card.append(thumbnail, title, date);
+        const explanation = document.createElement('p');
+        explanation.className = 'image-explanation';
+        explanation.textContent = image.explanation;
+
+        card.append(thumbnail, title, date, explanation);
         card.addEventListener('click', () => openModal(image));
         card.addEventListener('keydown', (event) => {
             if (event.key === 'Enter' || event.key === ' ') {

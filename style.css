@@ -150,6 +150,11 @@ button:hover {
   color: #666;
 }
 
+.gallery-item .image-explanation {
+  color: #333;
+  line-height: 1.5;
+}
+
 body.modal-open {
   overflow: hidden;
 }
