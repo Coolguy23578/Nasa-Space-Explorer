@@ -18,43 +18,8 @@ setupDateInputs(startInput, endInput);
 
 const API_KEY = "jrRmc7CTBzF9PtGFwTfnnNt9FNjdzr6LwkkKBmz8";
 const API_URL = "https://api.nasa.gov/planetary/apod";
-const IMAGE_LIBRARY_URL = "https://images-api.nasa.gov/search";
 const GENERIC_APOD_TITLE = 'NASA Science';
 const GENERIC_APOD_EXPLANATION = 'Discover the cosmos! Each day a different image';
-const ASTRONOMY_SEARCHES = [
-    'galaxy',
-    'nebula',
-    'planet',
-    'moon',
-    'star',
-    'comet',
-    'asteroid',
-    'deep space'
-];
-const EXCLUDED_TERMS = [
-    'training',
-    'mockup',
-    'employee',
-    'facility',
-    'promotional',
-    'logo',
-    'portrait',
-    'classroom',
-    'simulator'
-];
-const PREFERRED_TERMS = [
-    'galaxy',
-    'nebula',
-    'planet',
-    'moon',
-    'star',
-    'comet',
-    'asteroid',
-    'solar system',
-    'deep space',
-    'telescope',
-    'observatory'
-];
 
 // Fetch the photos for the selected date range
 async function getSpaceImages() {
@@ -69,89 +34,18 @@ async function getSpaceImages() {
         }
 
         const data = await response.json();
-        const hasRealPhotos = displayImages(Array.isArray(data) ? data : [data]);
-
-        if (!hasRealPhotos) {
-            await getNASAImageLibraryPhotos();
-        }
+        displayImages(Array.isArray(data) ? data : [data]);
     } catch (error) {
-        gallery.innerHTML = `<div class="placeholder"><p>NASA's image services are unavailable right now. Please try again later.</p></div>`;
+        gallery.innerHTML = `<div class="placeholder"><p>NASA's APOD service is unavailable right now. Please try again later.</p></div>`;
         console.error("Error loading NASA images:", error);
     }
-}
-
-// Load real NASA photographs when APOD returns generic placeholder records.
-async function getNASAImageLibraryPhotos() {
-    const startYear = new Date(`${startInput.value}T00:00:00`).getUTCFullYear();
-    const endYear = new Date(`${endInput.value}T00:00:00`).getUTCFullYear();
-    const searchResults = await Promise.all(ASTRONOMY_SEARCHES.map(async (searchTerm) => {
-        const searchParams = new URLSearchParams({
-            q: searchTerm,
-            media_type: 'image',
-            year_start: String(startYear),
-            year_end: String(endYear),
-            page_size: '12'
-        });
-        const response = await fetch(`${IMAGE_LIBRARY_URL}?${searchParams}`);
-
-        if (!response.ok) {
-            throw new Error(`NASA image search failed for ${searchTerm}`);
-        }
-
-        return (await response.json()).collection?.items || [];
-    }));
-
-    const photos = searchResults
-        .flat()
-        .map((item) => {
-            const details = item.data?.[0];
-            const imageLink = item.links?.find((link) => link.render === 'image' && link.rel === 'canonical')
-                || item.links?.find((link) => link.render === 'image' && link.rel !== 'preview')
-                || item.links?.find((link) => link.render === 'image');
-            const text = `${details?.title || ''} ${details?.description || ''}`.toLowerCase();
-            const score = PREFERRED_TERMS.reduce((total, term) => total + (text.includes(term) ? 1 : 0), 0);
-
-            return {
-                id: details?.nasa_id || item.href,
-                date: details?.date_created?.split('T')[0] || 'NASA image',
-                title: details?.title,
-                explanation: getReadableDescription(details?.description),
-                media_type: 'image',
-                url: imageLink?.href,
-                score,
-                searchDate: startInput.value === endInput.value
-                    ? startInput.value
-                    : `${startInput.value} to ${endInput.value}`,
-                source: 'NASA Image and Video Library'
-            };
-        })
-        .filter((image) => {
-            const text = `${image.title || ''} ${image.explanation || ''}`.toLowerCase();
-            return image.score > 0 && !EXCLUDED_TERMS.some((term) => text.includes(term));
-        })
-        .sort((first, second) => second.score - first.score);
-
-    if (!displayImages(photos)) {
-        throw new Error("NASA returned no usable image library photos");
-    }
-}
-
-// Remove HTML markup so descriptions appear as readable text.
-function getReadableDescription(description) {
-    if (!description) {
-        return 'NASA image from the space image library.';
-    }
-
-    const textContainer = document.createElement('div');
-    textContainer.innerHTML = description;
-    return textContainer.textContent.trim();
 }
 
 // Create a card for every photo returned by NASA
 function displayImages(images) {
     gallery.innerHTML = '';
 
-    const imageIds = new Set();
+    const imageDates = new Set();
     const imageUrls = new Set();
     const realImages = images.filter((image) => {
         const imageUrl = image.hdurl || image.url;
@@ -165,12 +59,12 @@ function displayImages(images) {
             && !isGenericTitle
             && !isGenericExplanation
             && !isNASAPlaceholder
-            && !imageIds.has(image.id || imageUrl)
+            && !imageDates.has(image.date)
             && !imageUrls.has(imageUrl);
 
         if (isUsable) {
             image.imageUrl = imageUrl;
-            imageIds.add(image.id || imageUrl);
+            imageDates.add(image.date);
             imageUrls.add(imageUrl);
         }
 
@@ -206,11 +100,7 @@ function displayImages(images) {
         explanation.className = 'image-explanation';
         explanation.textContent = image.explanation;
 
-        const source = document.createElement('p');
-        source.className = 'image-source';
-        source.textContent = image.source || 'NASA Astronomy Picture of the Day';
-
-        card.append(thumbnail, title, date, source, explanation);
+        card.append(thumbnail, title, date, explanation);
         card.addEventListener('click', () => openModal(image));
         card.addEventListener('keydown', (event) => {
             if (event.key === 'Enter' || event.key === ' ') {
@@ -236,7 +126,7 @@ function displayImages(images) {
 function openModal(image) {
     modalImage.src = image.imageUrl;
     modalImage.alt = image.title;
-    modalSource.textContent = image.source || 'NASA Astronomy Picture of the Day';
+    modalSource.textContent = 'NASA Astronomy Picture of the Day';
     modalDate.textContent = image.date;
     modalTitle.textContent = image.title;
     modalExplanation.textContent = image.explanation;
