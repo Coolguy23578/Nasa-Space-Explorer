@@ -241,6 +241,11 @@ body.modal-open {
   border: none;
 }
 
+.modal-content > img[hidden],
+.modal-content > iframe[hidden] {
+  display: none;
+}
+
 .modal-details {
   padding: 15px 5px 5px;
 }
