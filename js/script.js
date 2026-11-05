@@ -15,9 +15,8 @@ const modalExplanation = document.getElementById('modalExplanation');
 // Set up the date inputs with NASA's valid date range and default dates
 setupDateInputs(startInput, endInput);
 
-const API_KEY = "NTThCMD8hwz8cLDnpNGT9CdGRrGM6FfnG8h6dkFm";
+const API_KEY = "jrRmc7CTBzF9PtGFwTfnnNt9FNjdzr6LwkkKBmz8";
 const API_URL = "https://api.nasa.gov/planetary/apod";
-const IMAGE_LIBRARY_URL = "https://images-api.nasa.gov/search";
 
 // Fetch the photos for the selected date range
 async function getSpaceImages() {
@@ -34,9 +33,7 @@ async function getSpaceImages() {
         const data = await response.json();
         const hasRealPhotos = displayImages(Array.isArray(data) ? data : [data]);
 
-        if (!hasRealPhotos) {
-            await getNASAImageLibraryPhotos();
-        }
+       
     } catch (error) {
         gallery.innerHTML = `<div class="placeholder"><p>We could not load the images. Please try again.</p></div>`;
         console.error("Error loading NASA images:", error);
@@ -98,7 +95,7 @@ function displayImages(images) {
         card.setAttribute('aria-label', `View details for ${image.title}`);
 
         const thumbnail = document.createElement('img');
-        thumbnail.src = image.url;
+        thumbnail.src = image.hdurl || image.url;
         thumbnail.alt = image.title;
 
         const title = document.createElement('h2');
