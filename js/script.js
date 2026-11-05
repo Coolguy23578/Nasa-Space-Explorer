@@ -17,6 +17,7 @@ setupDateInputs(startInput, endInput);
 
 const API_KEY = "NTThCMD8hwz8cLDnpNGT9CdGRrGM6FfnG8h6dkFm";
 const API_URL = "https://api.nasa.gov/planetary/apod";
+const IMAGE_LIBRARY_URL = "https://images-api.nasa.gov/search";
 
 // Fetch the photos for the selected date range
 async function getSpaceImages() {
@@ -31,11 +32,52 @@ async function getSpaceImages() {
         }
 
         const data = await response.json();
-        displayImages(Array.isArray(data) ? data : [data]);
+        const hasRealPhotos = displayImages(Array.isArray(data) ? data : [data]);
+
+        if (!hasRealPhotos) {
+            await getNASAImageLibraryPhotos();
+        }
     } catch (error) {
         gallery.innerHTML = `<div class="placeholder"><p>We could not load the images. Please try again.</p></div>`;
         console.error("Error loading NASA images:", error);
     }
+}
+
+// Use NASA's image library when APOD returns a generic placeholder record.
+async function getNASAImageLibraryPhotos() {
+    const url = `${IMAGE_LIBRARY_URL}?q=space&media_type=image&page_size=9`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error("Failed to fetch NASA image library photos");
+    }
+
+    const result = await response.json();
+    const photos = result.collection.items.map((item) => {
+        const details = item.data[0];
+        const imageLink = item.links?.find((link) => link.render === 'image');
+
+        return {
+            date: details.date_created?.split('T')[0] || 'NASA image',
+            title: details.title,
+            explanation: getReadableDescription(details.description),
+            media_type: 'image',
+            url: imageLink?.href
+        };
+    });
+
+    displayImages(photos);
+}
+
+// Remove HTML markup so descriptions appear as readable text.
+function getReadableDescription(description) {
+    if (!description) {
+        return 'NASA image from the space image library.';
+    }
+
+    const textContainer = document.createElement('div');
+    textContainer.innerHTML = description;
+    return textContainer.textContent.trim();
 }
 
 // Create a card for every photo returned by NASA
@@ -84,10 +126,12 @@ function displayImages(images) {
     if (!realImages.length) {
         gallery.innerHTML = `
             <div class="placeholder">
-                <p>No space photos were returned for these dates. Please choose another date range and try again.</p>
+                <p>No space photos were found. Please try again.</p>
             </div>
         `;
     }
+
+    return realImages.length > 0;
 }
 
 // Show the selected image and its full NASA explanation
