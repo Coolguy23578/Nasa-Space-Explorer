@@ -31,6 +31,8 @@ async function getSpaceImages() {
         }
 
         const data = await response.json();
+        console.log("NASA RESPONSE:", data);
+        console.log("FIRST IMAGE:", Array.isArray(data) ? data[0] : data);
         const hasRealPhotos = displayImages(Array.isArray(data) ? data : [data]);
 
        
