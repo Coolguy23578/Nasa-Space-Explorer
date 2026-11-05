@@ -18,13 +18,18 @@ const modalExplanation = document.getElementById('modalExplanation');
 setupDateInputs(startInput, endInput);
 
 const API_KEY = "jrRmc7CTBzF9PtGFwTfnnNt9FNjdzr6LwkkKBmz8";
-const API_URL = "https://api.nasa.gov/planetary/apod";
+const API_URL = "https://science.nasa.gov/wp-json/wp/v2/apod-basic/";
 const GENERIC_APOD_TITLE = 'NASA Science';
 const GENERIC_APOD_EXPLANATION = 'Discover the cosmos! Each day a different image';
 
 // Fetch the photos for the selected date range
 async function getSpaceImages() {
-    const url = `${API_URL}?api_key=${API_KEY}&start_date=${startInput.value}&end_date=${endInput.value}`;
+    const searchParams = new URLSearchParams({
+        api_key: API_KEY,
+        start_date: startInput.value,
+        end_date: endInput.value
+    });
+    const url = `${API_URL}?${searchParams}`;
 
     try {
         gallery.innerHTML = '<div class="placeholder"><p>Loading space images...</p></div>';
@@ -99,7 +104,7 @@ function displayImages(images) {
 
         const explanation = document.createElement('p');
         explanation.className = 'image-explanation';
-        explanation.textContent = image.explanation;
+        explanation.textContent = getReadableDescription(image.explanation);
 
         card.append(title, date, explanation);
         card.addEventListener('click', () => openModal(image));
@@ -128,8 +133,13 @@ function getMediaUrl(image) {
         return image.url;
     }
 
-    const imageUrls = [image.hdurl, image.url];
-    return imageUrls.find((url) => /^https?:\/\//.test(url || '') && !url.toLowerCase().includes('nasa-logo'));
+    return /^https?:\/\//.test(image.hdurl || '') ? image.hdurl : undefined;
+}
+
+function getReadableDescription(description) {
+    const textContainer = document.createElement('div');
+    textContainer.innerHTML = description || '';
+    return textContainer.textContent.trim();
 }
 
 function removeInvalidCard(card) {
@@ -156,7 +166,7 @@ function openModal(image) {
     modalSource.textContent = 'NASA Astronomy Picture of the Day';
     modalDate.textContent = image.date;
     modalTitle.textContent = image.title;
-    modalExplanation.textContent = image.explanation;
+    modalExplanation.textContent = getReadableDescription(image.explanation);
     imageModal.hidden = false;
     document.body.classList.add('modal-open');
     closeModalButton.focus();
