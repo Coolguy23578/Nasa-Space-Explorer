@@ -40,31 +40,7 @@ async function getSpaceImages() {
     }
 }
 
-// Use NASA's image library when APOD returns a generic placeholder record.
-async function getNASAImageLibraryPhotos() {
-    const url = `${IMAGE_LIBRARY_URL}?q=space&media_type=image&page_size=9`;
-    const response = await fetch(url);
 
-    if (!response.ok) {
-        throw new Error("Failed to fetch NASA image library photos");
-    }
-
-    const result = await response.json();
-    const photos = result.collection.items.map((item) => {
-        const details = item.data[0];
-        const imageLink = item.links?.find((link) => link.render === 'image');
-
-        return {
-            date: details.date_created?.split('T')[0] || 'NASA image',
-            title: details.title,
-            explanation: getReadableDescription(details.description),
-            media_type: 'image',
-            url: imageLink?.href
-        };
-    });
-
-    displayImages(photos);
-}
 
 // Remove HTML markup so descriptions appear as readable text.
 function getReadableDescription(description) {
