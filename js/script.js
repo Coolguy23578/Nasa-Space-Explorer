@@ -8,6 +8,7 @@ const gallery = document.getElementById('gallery');
 const imageModal = document.getElementById('imageModal');
 const closeModalButton = document.getElementById('closeModal');
 const modalImage = document.getElementById('modalImage');
+const modalVideo = document.getElementById('modalVideo');
 const modalSource = document.getElementById('modalSource');
 const modalDate = document.getElementById('modalDate');
 const modalTitle = document.getElementById('modalTitle');
@@ -41,53 +42,53 @@ async function getSpaceImages() {
     }
 }
 
-// Create a card for every photo returned by NASA
+// Create a card for every valid APOD image or video returned by NASA.
 function displayImages(images) {
     gallery.innerHTML = '';
 
-    const imageDates = new Set();
-    const imageUrls = new Set();
-    const realImages = images.filter((image) => {
-        const imageUrl = image.hdurl || image.url;
+    const recordKeys = new Set();
+    const validRecords = images.filter((image) => {
+        const mediaUrl = getMediaUrl(image);
         const isGenericTitle = image.title === GENERIC_APOD_TITLE;
         const isGenericExplanation = image.explanation?.startsWith(GENERIC_APOD_EXPLANATION);
-        const isNASAPlaceholder = imageUrl?.toLowerCase().includes('nasa-logo');
-        const isUsable = image.media_type === 'image'
+        const isNASAPlaceholder = mediaUrl?.toLowerCase().includes('nasa-logo');
+        const recordKey = `${image.date}:${mediaUrl}`;
+        const isUsable = (image.media_type === 'image' || image.media_type === 'video')
             && image.title
             && image.explanation
-            && /^https?:\/\//.test(imageUrl || '')
+            && /^https?:\/\//.test(mediaUrl || '')
             && !isGenericTitle
             && !isGenericExplanation
             && !isNASAPlaceholder
-            && !imageDates.has(image.date)
-            && !imageUrls.has(imageUrl);
+            && !recordKeys.has(recordKey);
 
         if (isUsable) {
-            image.imageUrl = imageUrl;
-            imageDates.add(image.date);
-            imageUrls.add(imageUrl);
+            image.mediaUrl = mediaUrl;
+            recordKeys.add(recordKey);
         }
 
         return isUsable;
     });
 
-    realImages.forEach((image) => {
-
+    validRecords.forEach((image) => {
         const card = document.createElement('article');
         card.className = 'gallery-item';
         card.tabIndex = 0;
         card.setAttribute('role', 'button');
         card.setAttribute('aria-label', `View details for ${image.title}`);
 
-        const thumbnail = document.createElement('img');
-        thumbnail.src = image.imageUrl;
-        thumbnail.alt = image.title;
-        thumbnail.addEventListener('error', () => {
-            card.remove();
-            if (!gallery.querySelector('.gallery-item')) {
-                gallery.innerHTML = '<div class="placeholder"><p>No usable space photos were found.</p></div>';
-            }
-        });
+        if (image.media_type === 'image') {
+            const thumbnail = document.createElement('img');
+            thumbnail.src = image.mediaUrl;
+            thumbnail.alt = image.title;
+            thumbnail.addEventListener('error', () => removeInvalidCard(card));
+            card.appendChild(thumbnail);
+        } else {
+            const videoPreview = document.createElement('div');
+            videoPreview.className = 'video-preview';
+            videoPreview.textContent = 'Video APOD - click to view';
+            card.appendChild(videoPreview);
+        }
 
         const title = document.createElement('h2');
         title.textContent = image.title;
@@ -100,7 +101,7 @@ function displayImages(images) {
         explanation.className = 'image-explanation';
         explanation.textContent = image.explanation;
 
-        card.append(thumbnail, title, date, explanation);
+        card.append(title, date, explanation);
         card.addEventListener('click', () => openModal(image));
         card.addEventListener('keydown', (event) => {
             if (event.key === 'Enter' || event.key === ' ') {
@@ -111,21 +112,47 @@ function displayImages(images) {
         gallery.appendChild(card);
     });
 
-    if (!realImages.length) {
+    if (!validRecords.length) {
         gallery.innerHTML = `
             <div class="placeholder">
-                <p>No space photos were found. Please try again.</p>
+                <p>NASA returned no usable APOD images or videos for these dates. Try another date range.</p>
             </div>
         `;
     }
 
-    return realImages.length > 0;
+    return validRecords.length > 0;
+}
+
+function getMediaUrl(image) {
+    if (image.media_type === 'video') {
+        return image.url;
+    }
+
+    const imageUrls = [image.hdurl, image.url];
+    return imageUrls.find((url) => /^https?:\/\//.test(url || '') && !url.toLowerCase().includes('nasa-logo'));
+}
+
+function removeInvalidCard(card) {
+    card.remove();
+    if (!gallery.querySelector('.gallery-item')) {
+        gallery.innerHTML = '<div class="placeholder"><p>NASA returned no usable APOD images for these dates.</p></div>';
+    }
 }
 
 // Show the selected image and its full NASA explanation
 function openModal(image) {
-    modalImage.src = image.imageUrl;
-    modalImage.alt = image.title;
+    if (image.media_type === 'video') {
+        modalImage.hidden = true;
+        modalVideo.hidden = false;
+        modalVideo.src = getVideoEmbedUrl(image.mediaUrl);
+    } else {
+        modalImage.hidden = false;
+        modalVideo.hidden = true;
+        modalVideo.src = '';
+        modalImage.src = image.mediaUrl;
+        modalImage.alt = image.title;
+    }
+
     modalSource.textContent = 'NASA Astronomy Picture of the Day';
     modalDate.textContent = image.date;
     modalTitle.textContent = image.title;
@@ -135,10 +162,31 @@ function openModal(image) {
     closeModalButton.focus();
 }
 
+function getVideoEmbedUrl(url) {
+    try {
+        const parsedUrl = new URL(url);
+        if (parsedUrl.hostname.includes('youtube.com')) {
+            const videoId = parsedUrl.searchParams.get('v');
+            return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+        }
+
+        if (parsedUrl.hostname === 'youtu.be') {
+            return `https://www.youtube.com/embed${parsedUrl.pathname}`;
+        }
+    } catch (error) {
+        console.error('Unable to prepare APOD video:', error);
+    }
+
+    return url;
+}
+
 // Close the modal and clear its image
 function closeModal() {
     imageModal.hidden = true;
     modalImage.src = '';
+    modalImage.hidden = false;
+    modalVideo.src = '';
+    modalVideo.hidden = true;
     document.body.classList.remove('modal-open');
 }
 
