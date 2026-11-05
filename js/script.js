@@ -42,10 +42,12 @@ async function getSpaceImages() {
 function displayImages(images) {
     gallery.innerHTML = '';
 
-    images.forEach((image) => {
-        if (image.media_type !== 'image') {
-            return;
-        }
+    const realImages = images.filter((image) => {
+        const isNASAPlaceholder = image.url?.includes('nasa-logo');
+        return image.media_type === 'image' && image.url && !isNASAPlaceholder;
+    });
+
+    realImages.forEach((image) => {
 
         const card = document.createElement('article');
         card.className = 'gallery-item';
@@ -79,8 +81,12 @@ function displayImages(images) {
         gallery.appendChild(card);
     });
 
-    if (!gallery.children.length) {
-        gallery.innerHTML = '<div class="placeholder"><p>No images were found for these dates.</p></div>';
+    if (!realImages.length) {
+        gallery.innerHTML = `
+            <div class="placeholder">
+                <p>No space photos were returned for these dates. Please choose another date range and try again.</p>
+            </div>
+        `;
     }
 }
 
