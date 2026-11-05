@@ -53,7 +53,7 @@ async function getSpaceImages() {
     }
 }
 
-// Create a card for every valid APOD image or video returned by NASA.
+// Create a card for every valid APOD image returned by NASA.
 function displayImages(images, startDate, endDate) {
     gallery.innerHTML = '';
 
@@ -66,7 +66,7 @@ function displayImages(images, startDate, endDate) {
         const isNASAPlaceholder = mediaUrl?.toLowerCase().includes('nasa-logo');
         const recordKey = `${image.date}:${mediaUrl}`;
         const isUsable = isInSelectedRange
-            && (image.media_type === 'image' || image.media_type === 'video')
+            && image.media_type === 'image'
             && image.title
             && image.explanation
             && /^https?:\/\//.test(mediaUrl || '')
@@ -103,21 +103,6 @@ function displayImages(images, startDate, endDate) {
                 }
             });
             card.appendChild(thumbnail);
-        } else {
-            const videoPreview = document.createElement('div');
-            videoPreview.className = 'video-preview';
-            videoPreview.textContent = 'Video APOD - click to view';
-            videoPreview.tabIndex = 0;
-            videoPreview.setAttribute('role', 'button');
-            videoPreview.setAttribute('aria-label', `View details for ${image.title}`);
-            videoPreview.addEventListener('click', () => openModal(image));
-            videoPreview.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    openModal(image);
-                }
-            });
-            card.appendChild(videoPreview);
         }
 
         const title = document.createElement('h2');
@@ -134,7 +119,7 @@ function displayImages(images, startDate, endDate) {
     if (!validRecords.length) {
         gallery.innerHTML = `
             <div class="placeholder">
-                <p>NASA returned no usable APOD images or videos for these dates. Try another date range.</p>
+                <p>NASA returned no usable APOD images for these dates. Try another date range.</p>
             </div>
         `;
     }
